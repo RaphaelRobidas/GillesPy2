@@ -48,6 +48,7 @@ class ODESolver(GillesPySolver):
         self.model = copy.deepcopy(model)
         self.is_instantiated = True
 
+
     @staticmethod
     def __f(t, y, curr_state, model, c_prop):
         """
@@ -66,13 +67,26 @@ class ODESolver(GillesPySolver):
         for i, species in enumerate(model.listOfSpecies):
             curr_state[0][species] = y[i]
             state_change[species] = 0
+        for r_name, reaction in model.listOfReactions.items():
+            if r_name[-1] == 'b':
+                continue
+            name, direction = r_name.split('#')
+            state_change[name] = 0
+
         propensity = OrderedDict()
         for r_name, reaction in model.listOfReactions.items():
             propensity[r_name] = eval(c_prop[r_name], curr_state[0])
+            name, direction = r_name.split('#')
+            if direction == 'f':
+                state_change[name] += propensity[r_name]
+            else:
+                state_change[name] -= propensity[r_name]
+
             for react, stoich in reaction.reactants.items():
                 state_change[react.name] -= propensity[r_name] * stoich
             for prod, stoich in reaction.products.items():
                 state_change[prod.name] += propensity[r_name] * stoich
+
         state_change = list(state_change.values())
         return state_change
 
@@ -232,8 +246,8 @@ class ODESolver(GillesPySolver):
             raise SimulationError(
                 f"Error encountered while running simulation:\nReturn code: {int(self.rc)}.\n"
             ) from self.has_raised_exception
-        
-        return Results.build_from_solver_results(self, live_output_options)
+
+        return [[Results.build_from_solver_results(self, live_output_options)[0], self.significance]]
 
     def ___run(self, curr_state, curr_time, timeline, trajectory_base, tmpSpecies, live_grapher, t=20,
                number_of_trajectories=1, increment=0.05, timeout=None, show_labels=True, integrator='lsoda',
@@ -260,17 +274,15 @@ class ODESolver(GillesPySolver):
                     "'t' must be greater than previous simulations end time, or set in the run() method as the "
                     "simulations next end time")
 
+        curr_state[0] = OrderedDict()
+
         # compile reaction propensity functions for eval
         c_prop = OrderedDict()
-        for r_name, reaction in self.model.listOfReactions.items():
-            c_prop[r_name] = compile(reaction.ode_propensity_function, '<string>', 'eval')
-
         result = trajectory_base[0]
         entry_count = 0
 
-        y0 = [0] * len(self.model.listOfSpecies)
-
-        curr_state[0] = OrderedDict()
+        n_unique_reactions = len([i for i in self.model.listOfReactions if i[-1] != 'b'])
+        y0 = [0] * (len(self.model.listOfSpecies) + n_unique_reactions)
 
         if resume is not None:
             for i, s in enumerate(tmpSpecies):
@@ -281,6 +293,11 @@ class ODESolver(GillesPySolver):
                 curr_state[0][s.name] = s.initial_value
                 y0[i] = s.initial_value
 
+        for r_name, reaction in self.model.listOfReactions.items():
+            c_prop[r_name] = compile(reaction.ode_propensity_function, '<string>', 'eval')
+            name, direction = r_name.split('#')
+            curr_state[0][name] = 0
+
         for p_name, param in self.model.listOfParameters.items():
             curr_state[0][p_name] = param.value
         if 'vol' not in curr_state[0]:
@@ -288,6 +305,7 @@ class ODESolver(GillesPySolver):
         rhs = ode(ODESolver.__f).set_integrator(integrator, **integrator_options)
         rhs.set_initial_value(y0, curr_time[0]).set_f_params(curr_state, self.model, c_prop)
 
+        self.significance = {}
         while entry_count < timeline.size - 1:
             if self.stop_event.is_set():
                 self.rc = 33
@@ -304,11 +322,20 @@ class ODESolver(GillesPySolver):
                 curr_state[0][spec] = y0[i]
                 result[entry_count][i+1] = curr_state[0][spec]
 
+        ind = 0
+        for reac in self.model.listOfReactions:
+            if reac[-1] == 'b':
+                continue
+            name, direction = reac.split('#')
+            self.significance[name] = y0[len(self.model.listOfSpecies)+ind]
+            ind += 1
+
         results_as_dict = {
             'time': timeline
         }
         for i, species in enumerate(self.model.listOfSpecies):
             results_as_dict[species] = result[:, i+1]
+
         results = [results_as_dict] * number_of_trajectories
 
         if timeStopped != 0 or resume is not None:
