@@ -68,8 +68,6 @@ class ODESolver(GillesPySolver):
             curr_state[0][species] = y[i]
             state_change[species] = 0
         for r_name, reaction in model.listOfReactions.items():
-            if r_name[-1] == 'b':
-                continue
             name, direction = r_name.split('#')
             state_change[name] = 0
 
@@ -281,7 +279,8 @@ class ODESolver(GillesPySolver):
         result = trajectory_base[0]
         entry_count = 0
 
-        n_unique_reactions = len([i for i in self.model.listOfReactions if i[-1] != 'b'])
+        unique_reactions = set([i.split('#')[0] for i in self.model.listOfReactions])
+        n_unique_reactions = len(unique_reactions)
         y0 = [0] * (len(self.model.listOfSpecies) + n_unique_reactions)
 
         if resume is not None:
@@ -323,11 +322,8 @@ class ODESolver(GillesPySolver):
                 result[entry_count][i+1] = curr_state[0][spec]
 
         ind = 0
-        for reac in self.model.listOfReactions:
-            if reac[-1] == 'b':
-                continue
-            name, direction = reac.split('#')
-            self.significance[name] = y0[len(self.model.listOfSpecies)+ind]
+        for reac in unique_reactions:
+            self.significance[reac] = y0[len(self.model.listOfSpecies)+ind]
             ind += 1
 
         results_as_dict = {
