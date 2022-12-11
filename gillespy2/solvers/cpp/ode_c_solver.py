@@ -24,18 +24,72 @@ from gillespy2.core import Results
 from .c_solver import CSolver, SimulationReturnCode
 
 class ODECSolver(GillesPySolver, CSolver):
+    """
+    This Solver produces the deterministic continuous solution via Ordinary Differential Equations.
+    Uses integrators from SUNDIALS to perform calculations used to produce solutions.
+    """
+
     name = "ODECSolver"
     target = "ode"
 
-    def get_solver_settings(self):
+    @staticmethod
+    def get_supported_integrator_options():
+        return {
+            "rtol",
+            "atol",
+            "max_step",
+        }
+
+    @classmethod
+    def get_solver_settings(cls):
         """
+        Returns a list of arguments supported by odc_c_solver.run.
         :returns: Tuple of strings, denoting all keyword argument for this solvers run() method.
+        :rtype: tuple
         """
         return ('model', 't', 'number_of_trajectories', 'timeout', 'increment', 'seed', 'debug', 'profile')
 
     def run(self=None, model: Model = None, t: int = None, number_of_trajectories: int = 1, timeout: int = 0,
             increment: int = None, seed: int = None, debug: bool = False, profile: bool = False, variables={},
-            resume=None, live_output: str = None, live_output_options: dict = {}, **kwargs):
+            resume=None, live_output: str = None, live_output_options: dict = {}, integrator_options: "dict[str, float]" = None, **kwargs):
+
+        """
+        :param model: The model on which the solver will operate. (Deprecated)
+        :type model: gillespy2.Model
+
+        :param t: End time of simulation.
+        :type t: int
+
+        :param number_of_trajectories: Number of trajectories to simulate.
+            This is deterministic and will always have same results.
+        :type number_of_trajectories: int
+
+        :param timeout: If set, if simulation takes longer than timeout, will exit.
+        :type timeout: int
+
+        :param increment: Time step increment for plotting.
+        :type increment: float
+
+        :param seed: The random seed for the simulation. Optional, defaults to None.
+        :type seed: int
+
+        :param variables: Dictionary of species and their data that will override existing species data.
+        :type variables: dict
+
+        :param resume: Result of a previously run simulation, to be resumed.
+        :type resume: gillespy2.Results
+
+        :param live_output: The type of output to be displayed by solver. Can be "progress", "text", or "graph".
+        :type live_output: str
+
+        :param live_output_options: Dictionary that contains options for live_output. By default {"interval":1}.
+            "interval" specifies seconds between displaying.
+            "clear_output" specifies if display should be refreshed with each display.
+        :type live_output_options:  dict
+
+        :returns: A result object containing the results of the simulation.
+        :rtype: gillespy2.Results
+        """
 
         from gillespy2 import log
 
@@ -61,7 +115,7 @@ class ODECSolver(GillesPySolver, CSolver):
                 raise SimulationError("A model is required to run the simulation.")
             self._set_model(model=model)
 
-        self.model.resolve_parameters()
+        self.model.compile_prep()
         self.validate_model(self.model, model)
         self.validate_sbml_features(model=self.model)
 
@@ -83,7 +137,6 @@ class ODECSolver(GillesPySolver, CSolver):
         number_timesteps = int(round(t / increment + 1))
 
         args = {
-            "trajectories": number_of_trajectories,
             "timesteps": number_timesteps,
             "end": t,
             "increment": increment,
@@ -98,6 +151,9 @@ class ODECSolver(GillesPySolver, CSolver):
                 "init_pop": populations,
                 "parameters": parameter_values
             })
+        if integrator_options is not None:
+            integrator_options = ODECSolver.validate_integrator_options(integrator_options)
+            args.update(integrator_options)
 
         seed = self._validate_seed(seed)
         if seed is not None:
@@ -115,7 +171,7 @@ class ODECSolver(GillesPySolver, CSolver):
             display_args = None
 
         args = self._make_args(args)
-        decoder = IterativeSimDecoder.create_default(number_of_trajectories, number_timesteps, len(self.model.listOfSpecies))
+        decoder = IterativeSimDecoder.create_default(1, number_timesteps, len(self.model.listOfSpecies))
 
         sim_exec = self._build(self.model, self.target, self.variable, False)
         sim_status = self._run(sim_exec, args, decoder, timeout, display_args)
@@ -134,4 +190,4 @@ class ODECSolver(GillesPySolver, CSolver):
         self.result = simulation_data
         self.rc = int(sim_status)
 
-        return Results.build_from_solver_results(self, live_output_options)
+        return sum([Results.build_from_solver_results(self, live_output_options)] * number_of_trajectories)
