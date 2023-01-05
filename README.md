@@ -2,7 +2,7 @@
 <img src="https://raw.githubusercontent.com/StochSS/GillesPy2/develop/.graphics/gillespy2-logo.png">
 </p>
 
-GillesPy2 is a Python 3 package for stochastic simulation of biochemical systems.  It offers an object-oriented approach for creating mathematical models of biological systems, as well as a variety of methods for performing time simulation of those models.  The methods include the [Gillespie direct method (SSA)](https://en.wikipedia.org/wiki/Gillespie_algorithm), several variant stochastic simulation methods including [tau-Leaping](https://en.wikipedia.org/wiki/Tau-leaping), and numerical integration of ODEs.  The solvers support a variety of user environments, with optimized code for C++, [Cython](https://cython.org), and [NumPy](https://numpy.org).  GillesPy2 also supports [SBML](https://en.wikipedia.org/wiki/SBML).
+GillesPy2 is a Python 3 package for stochastic simulation of biochemical systems.  It offers an object-oriented approach for creating mathematical models of biological systems, as well as a variety of methods for performing time simulation of those models.  The methods include the [Gillespie direct method (SSA)](https://en.wikipedia.org/wiki/Gillespie_algorithm), several variant stochastic simulation methods including [tau-Leaping](https://en.wikipedia.org/wiki/Tau-leaping), and numerical integration of ODEs.  The solvers support a variety of user environments, with optimized code for C++, and [NumPy](https://numpy.org).  GillesPy2 also supports [SBML](https://en.wikipedia.org/wiki/SBML).
 
 <table><tr><td><b>
 <img width="20%" align="right" src="https://raw.githubusercontent.com/StochSS/GillesPy2/develop/.graphics/stochss-logo.png">
@@ -87,7 +87,7 @@ In GillesPy2, a model is expressed as an object.  Components, such as the reacti
 ```python
 def create_dimerization(parameter_values=None):
     # First call the gillespy2.Model initializer.
-    model = gillespy2.model(name='Dimerization')
+    model = gillespy2.Model(name='Dimerization')
 
     # Define parameters for the rates of creation and dissociation.
     k_c = gillespy2.Parameter(name='k_c', expression=0.005)
