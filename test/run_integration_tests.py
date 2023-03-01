@@ -61,6 +61,7 @@ if __name__ == '__main__':
     import test_hybrid_negative_state
     import test_run_output
     import test_hybrid_event_round
+    import test_telegraph_model
 
     modules = [
        test_empty_model,
@@ -91,6 +92,7 @@ if __name__ == '__main__':
        test_run_output,
        test_hybrid_negative_state,
        test_hybrid_event_round,
+       test_telegraph_model,
     ]
 
     for module in modules:
