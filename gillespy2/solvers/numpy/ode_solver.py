@@ -71,12 +71,12 @@ class ODESolver(GillesPySolver):
         for i, species in enumerate(model.listOfSpecies):
             curr_state[0][species] = y[i]
             state_change[species] = 0
-        for r_name, reaction in model.listOfReactions.items():
+        for r_name in sorted(model.listOfReactions.keys()):
             name, direction = r_name.split('#')
             state_change[name] = 0
 
         propensity = OrderedDict()
-        for r_name, reaction in model.listOfReactions.items():
+        for r_name, reaction in sorted(model.listOfReactions.items(), key=lambda i: i[0]):
             propensity[r_name] = eval(c_prop[r_name], curr_state[0])
             name, direction = r_name.split('#')
             if direction == 'f':
@@ -304,7 +304,7 @@ class ODESolver(GillesPySolver):
 
         unique_reactions = set([i.split('#')[0] for i in self.model.listOfReactions])
         n_unique_reactions = len(unique_reactions)
-        y0 = [0] * (len(self.model.listOfSpecies) + n_unique_reactions)
+        y0 = np.zeros(len(self.model.listOfSpecies) + n_unique_reactions)
 
         if resume is not None:
             for i, s in enumerate(tmpSpecies):
@@ -315,7 +315,7 @@ class ODESolver(GillesPySolver):
                 curr_state[0][s.name] = s.initial_value
                 y0[i] = s.initial_value
 
-        for r_name, reaction in self.model.listOfReactions.items():
+        for r_name, reaction in sorted(self.model.listOfReactions.items(), key=lambda i: i[0]):
             c_prop[r_name] = compile(reaction.ode_propensity_function, '<string>', 'eval')
             name, direction = r_name.split('#')
             curr_state[0][name] = 0
@@ -345,7 +345,7 @@ class ODESolver(GillesPySolver):
                 result[entry_count][i+1] = curr_state[0][spec]
 
         ind = 0
-        for reac in unique_reactions:
+        for reac in sorted(unique_reactions):
             self.significance[reac] = y0[len(self.model.listOfSpecies)+ind]
             ind += 1
 
